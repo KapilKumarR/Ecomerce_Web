@@ -104,6 +104,7 @@ def forgotPassword(request):
         existing_email = Account.objects.filter(email=email).exists()
         if existing_email == True:
             user = Account.objects.get(email__exact=email)
+            
             # Reset Password email
             current_site = get_current_site(request)
             mail_subject = "Password Reset"
@@ -117,7 +118,7 @@ def forgotPassword(request):
             send_email = EmailMessage(mail_subject,message,to=[to_email])
             send_email.send()
             #####################################################
-            
+            messages.success(request,f'Forget Password Email sent to registerd email: {email}')
             return redirect("login")
         else:
             messages.warning(request,'Account Not Found')
@@ -125,10 +126,39 @@ def forgotPassword(request):
     return render(request, 'AccountsApp/forgotPassword.html')
 
 
+#checking the reset password email
+def resetPassword_validate(request, uidb64, token):
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = Account._default_manager.get(pk=uid)
+    except(TypeError, ValueError, OverflowError, Account.DoesNotExist):
+        user = None
+    
+    if user is not None and default_token_generator.check_token(user,token):
+        request.session['uid'] = uid
+        messages.success(request, 'Please reset Your Password!')
+        return redirect('resetPassword')
+    else:
+        messages.error(request, "User not Found!")
+        return redirect('login')
 
-def resetPassword_validate(request):
-    return HttpResponse(request,'ok')
-
+def resetPassword(req):
+    if req.method == "POST":
+        password = req.POST['password']
+        confirm_password = req.POST['confirm_password']
+        
+        if password == confirm_password:
+            uid = req.session.get('uid')
+            user = Account.objects.get(pk=uid)
+            user.set_password(password)
+            user.save()
+            messages.success(req, "New password has been updated!")
+            return redirect('login')
+        else:
+            messages.warning(req,"Password Doesn't match!")
+            return redirect('resetPassword')
+    else:
+        return render(req, 'AccountsApp/resetPassword.html')
 
 
 
